@@ -1,16 +1,17 @@
 ﻿using MyWebServer.Controllers;
 using MyWebServer.Http;
 using SharedTrip.Data;
+using SharedTrip.Data.Models;
+using SharedTrip.Models.Trip;
 using SharedTrip.Services;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
+using System;
+using System.Globalization;
 
 namespace SharedTrip.Controllers
 {
-   public class TripsController:Controller
+    public class TripsController:Controller
     {
         private readonly ApplicationDbContext data;
         private readonly IValidator validator;
@@ -22,65 +23,141 @@ namespace SharedTrip.Controllers
             this.data = data;
             this.validator = validator;
         }
-
+        [Authorize]
         public HttpResponse All()
         {
+            if (!this.User.IsAuthenticated)
+            {
+                return Redirect("/Users/Login");
+            }
+
+
             var tripsQuery = this.data
                 .Trips
                 .AsQueryable();
 
-            if (this.User.IsAuthenticated)
-            {
-                tripsQuery = tripsQuery
-                    .Where(r => r.IsPublic || r.OwnerId == this.User.Id);
-            }
-            else
-            {
-                repositoriesQuery = repositoriesQuery
-                    .Where(r => r.IsPublic);
-            }
-
-            var repositores = repositoriesQuery
-                .OrderByDescending(r => r.CreatedOn)
-                .Select(r => new RepositoryListingViewModel
+           
+            var trips = tripsQuery
+                .Select(t => new TripsAllFormModel
                 {
-                    Id = r.Id,
-                    Name = r.Name,
-                    Owner = r.Owner.Username,
-                    CreatedOn = r.CreatedOn.ToLocalTime().ToString("F"),
-                    Commits = r.Commits.Count()
+                    Id=t.Id,
+                    StartPoint=t.StartPoint,
+                    EndPoint=t.EndPoint,
+                    DepartureTime=t.DepartureTime.ToString("dd.MM.yyyy HH:mm"),
+                    Seats=t.Seats,
+                    
                 })
                 .ToList();
 
-            return View(repositores);
+            return View(trips);
         }
-
+        
         [Authorize]
-        public HttpResponse Create() => View();
+        public HttpResponse Add()
+        {
+            if (!this.User.IsAuthenticated)
+            {
+                return Redirect("/Users/Login");
+            }
+
+            return View();
+        }
 
         [HttpPost]
         [Authorize]
-        public HttpResponse Create(CreateRepositoryFormModel model)
+        public HttpResponse Add(AddTripFormModel model)
         {
-            var modelErrors = this.validator.ValidateRepository(model);
+            var modelErrors = this.validator.ValidateTrip(model);
 
             if (modelErrors.Any())
             {
                 return Error(modelErrors);
             }
 
-            var repository = new Repository
+             DateTime.TryParseExact(model.DepartureTime, "dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture,DateTimeStyles.None, out DateTime date);
+
+            var trip = new Trip
             {
-                Name = model.Name,
-                IsPublic = model.RepositoryType == RepositoryPublicType,
-                OwnerId = this.User.Id
+                StartPoint = model.StartPoint,
+                EndPoint = model.StartPoint,
+                DepartureTime = date,
+                Seats = model.Seats,
+                Description = model.Description
             };
 
-            this.data.Repositories.Add(repository);
+            this.data.Trips.Add(trip);
 
             this.data.SaveChanges();
 
-            return Redirect("/Repositories/All");
+            return Redirect("/Trips/All");
         }
+
+       
+        [Authorize]
+        [HttpPost]
+        public HttpResponse Details(string Id)
+        {
+            var trip = this.data.
+                Trips
+                .Where(x=>x.Id==Id)
+                .Select(x=> new TripDetailsFormModel
+                {
+                    Id=x.Id,
+                    StartPoint=x.StartPoint,
+                    EndPoint = x.EndPoint,
+                    DepartureTime=x.DepartureTime.ToString("dd.MM.yyyy HH:mm"),
+                    Description=x.Description,
+                    Seats=x.Seats,
+                    ImagePath=x.ImagePath
+
+                }).FirstOrDefault();
+
+            
+
+            return this.View(trip);
+        }
+        [Authorize]
+        [HttpPost]
+        public HttpResponse AddUserToTrip(string tripId)
+        {
+            if (!User.IsAuthenticated)
+            {
+                return Redirect("/");
+            }
+
+            var user = this.User;
+
+            var userExistInTripCheck = this.data
+                .UserTrips
+                .FirstOrDefault(u => u.UserId == user.Id && u.TripId == tripId);
+
+            if (userExistInTripCheck != null)
+            {
+                return this.Error("This trip has already been added");
+            }
+
+            var newUserToTrip = new UserTrip { TripId = tripId, UserId = user.Id };
+
+            var currentTrip = this.data
+                .Trips
+                .FirstOrDefault(t => t.Id == tripId);
+
+            currentTrip.Seats -= 1;
+
+            if (currentTrip.Seats != 0 || currentTrip.Seats == 0)
+            {
+                this.data.Trips.Update(currentTrip);
+                this.data.UserTrips.Add(newUserToTrip);
+
+                this.data.SaveChanges();
+            }
+            else if (currentTrip.Seats < 0)
+            {
+                return this.Error("Тhere are no free seats");
+            }
+
+            return this.View(currentTrip, "Details");
+        }
+
     }
 }

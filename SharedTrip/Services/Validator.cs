@@ -1,10 +1,12 @@
-﻿namespace SharedTrip.Services
+﻿using SharedTrip.Models.Trip;
+using SharedTrip.Models.User;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using static SharedTrip.Data.DataConstants;
+
+namespace SharedTrip.Services
 {
-    using SharedTrip.Models;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text.RegularExpressions;
-    using static Data.DataConstants;
     public class Validator : IValidator
     {
         public ICollection<string> ValidateUser(RegisterUserFormModel model)
@@ -39,6 +41,22 @@
             return errors;
         }
 
+        public ICollection<string> ValidateTrip(AddTripFormModel model)
+        {
+            var errors = new List<string>();
 
+            if (model.Seats < SeatsMinValue || model.Seats > SeatsMaxValue)
+            {
+                errors.Add($"Number of seats ({model.Seats}) is not valid. It must be between {SeatsMinValue} and {SeatsMaxValue}.");
+            }
+
+            if (model.Description.Length > DescriptionMaxLenght )
+            {
+                errors.Add($"Desctription shouldn't be more than {DescriptionMaxLenght} symbols.");
+            }
+
+            return errors;
+        }
+        
     }
 }

@@ -3,6 +3,7 @@ using MyWebServer.Http;
 using SharedTrip.Data;
 using SharedTrip.Data.Models;
 using SharedTrip.Models;
+using SharedTrip.Models.User;
 using SharedTrip.Services;
 using System.Linq;
 
@@ -77,6 +78,8 @@ namespace SharedTrip.Controllers
             {
                 return Error("Username and password combination is not valid.");
             }
+
+            
 
             this.SignIn(userId);
 

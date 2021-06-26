@@ -1,4 +1,5 @@
-﻿using SharedTrip.Models;
+﻿using SharedTrip.Models.Trip;
+using SharedTrip.Models.User;
 using System.Collections.Generic;
 
 namespace SharedTrip.Services
@@ -7,6 +8,6 @@ namespace SharedTrip.Services
     {
         ICollection<string> ValidateUser(RegisterUserFormModel model);
 
-       // ICollection<string> ValidateRepository(CreateRepositoryFormModel model);
+        ICollection<string> ValidateTrip(AddTripFormModel model);
     }
 }
